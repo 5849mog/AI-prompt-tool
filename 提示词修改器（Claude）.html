@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Prompt Refiner Ultimate Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b1120;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --design-accent: #ec4899;
+            --design-glow: rgba(236, 72, 153, 0.4);
+            --pro-accent: #10b981;
+            --pro-glow: rgba(16, 185, 129, 0.4);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: pan-y;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        
+        .glass {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* 消息排版 */
+        .prose p { margin-bottom: 0.8em; line-height: 1.7; color: #cbd5e1; }
+        .prose h1, .prose h2, .prose h3 { color: #fff; margin-top: 1.2em; font-weight: 700; }
+        .prose ul { list-style-type: none; padding-left: 0; }
+        .prose li::before { content: "•"; color: var(--accent); display: inline-block; width: 1em; margin-left: -1em; }
+        .prose code { background: rgba(99, 102, 241, 0.15); padding: 2px 6px; border-radius: 4px; font-family: 'Menlo', monospace; color: #a5b4fc; font-size: 0.9em; }
+        .prose pre { background: #0f172a; border: 1px solid #334155; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+
+        /* 前端模式样式 */
+        .frontend-mode .prose li::before { color: var(--design-accent); }
+        .frontend-mode .prose code { background: rgba(236, 72, 153, 0.15); color: #fbcfe8; }
+        .frontend-mode .ai-label { background: var(--design-accent); box-shadow: 0 2px 4px var(--design-glow); }
+        
+        /* 专业模式样式 */
+        .pro-mode .prose li::before { color: var(--pro-accent); }
+        .pro-mode .prose code { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+        .pro-mode .ai-label { background: var(--pro-accent); box-shadow: 0 2px 4px var(--pro-glow); }
+        
+        .ai-message-box {
+            background: #1e293b; border: 1px solid #334155; transition: all 0.3s ease;
+        }
+        .ai-label {
+            position: absolute; top: -10px; left: 12px; background: var(--accent); color: white;
+            font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px;
+            text-transform: uppercase; box-shadow: 0 2px 4px var(--accent-glow); z-index: 5;
+        }
+
+        .typing-cursor::after {
+            content: ''; display: inline-block; width: 6px; height: 14px; background: currentColor; margin-left: 4px;
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* 模态框动画 */
+        #settings-modal { transition: opacity 0.2s ease, visibility 0.2s ease; }
+        #settings-modal.invisible { opacity: 0; pointer-events: none; }
+        #settings-modal.visible { opacity: 1; pointer-events: auto; }
+        #modal-content { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        #settings-modal.invisible #modal-content { transform: scale(0.95); }
+        #settings-modal.visible #modal-content { transform: scale(1); }
+
+        /* 图标 */
+        .icon-sparkles::before { content: "✨"; }
+        .icon-settings::before { content: "⚙️"; }
+        .icon-terminal::before { content: "💻"; }
+        .icon-send::before { content: "➤"; }
+        .icon-close::before { content: "✕"; }
+        .icon-save::before { content: "💾"; }
+        .icon-copy::before { content: "📋"; }
+        .icon-magic::before { content: "🪄"; }
+        .icon-check::before { content: "✓"; }
+        .icon-warning::before { content: "⚠"; }
+        .icon-palette::before { content: "🎨"; }
+        .icon-code::before { content: "⚡"; }
+        .icon-download::before { content: "⬇"; }
+
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .btn-active:active { transform: scale(0.96); }
+        
+        /* 模式切换按钮 */
+        .mode-btn.active {
+            color: white;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+        }
+        .mode-btn.active.frontend {
+            background-color: #be185d;
+            border-color: #be185d;
+            box-shadow: 0 0 10px var(--design-glow);
+        }
+        .mode-btn.active.professional {
+            background-color: #059669;
+            border-color: #059669;
+            box-shadow: 0 0 10px var(--pro-glow);
+        }
+
+        /* 高级功能按钮样式 */
+        .advanced-btn {
+            transition: all 0.2s ease;
+        }
+        .advanced-btn:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col relative">
+
+    <!-- Toast容器 -->
+    <div id="toast-container" class="fixed top-20 right-4 z-[100] flex flex-col gap-2"></div>
+
+    <!-- 顶部导航 -->
+    <header class="glass fixed top-0 w-full z-30 flex justify-between items-center px-5 py-4">
+        <div class="flex items-center gap-3">
+            <div id="app-logo" class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg transition-all duration-300">
+                <span class="icon-sparkles text-white text-lg"></span>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-tight text-white leading-tight">Prompt Refiner</h1>
+                <p id="app-subtitle" class="text-[10px] text-gray-400 font-medium tracking-wide transition-colors">ULTIMATE PRO</p>
+            </div>
+        </div>
+        <button id="settings-btn" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 active:bg-slate-600 flex items-center justify-center transition border border-slate-700 btn-active">
+            <span class="icon-settings text-gray-400 text-base"></span>
+        </button>
+    </header>
+
+    <!-- 聊天主区域 -->
+    <main id="chat-container" class="flex-1 overflow-y-auto px-4 pt-24 pb-32 scrollbar-hide space-y-6">
+        <div id="welcome-screen" class="h-full flex flex-col items-center justify-center opacity-40 select-none">
+            <div class="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6">
+                <span class="icon-terminal text-3xl text-gray-500"></span>
+            </div>
+            <p class="text-sm text-gray-400 font-mono text-center max-w-[280px]">
+                选择模式，输入需求<br>
+                生成专家级 Prompt<br>
+                <span class="text-xs opacity-60 mt-2 block">支持普通/前端/专业三种模式</span>
+            </p>
+        </div>
+    </main>
+
+    <!-- 底部输入栏 -->
+    <footer class="fixed bottom-0 w-full bg-[#0b1120] border-t border-slate-800 p-4 safe-area-bottom z-40">
+        <div class="max-w-3xl mx-auto">
+            <!-- 模式选择器 -->
+            <div class="flex gap-2 mb-3 justify-center">
+                <button id="mode-normal" class="mode-btn px-4 py-1.5 rounded-lg text-xs font-bold transition border border-slate-700 bg-slate-800 text-gray-400" onclick="setMode('normal')">
+                    <span class="icon-magic mr-1"></span>普通
+                </button>
+                <button id="mode-frontend" class="mode-btn frontend px-4 py-1.5 rounded-lg text-xs font-bold transition border border-slate-700 bg-slate-800 text-gray-400" onclick="setMode('frontend')">
+                    <span class="icon-palette mr-1"></span>前端
+                </button>
+                <button id="mode-professional" class="mode-btn professional px-4 py-1.5 rounded-lg text-xs font-bold transition border border-slate-700 bg-slate-800 text-gray-400" onclick="setMode('professional')">
+                    <span class="icon-code mr-1"></span>专业
+                </button>
+            </div>
+
+            <!-- 输入框 -->
+            <div class="relative group">
+                <div id="input-glow" class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl opacity-20 group-focus-within:opacity-60 transition duration-500 blur-sm"></div>
+                <div class="relative flex items-end gap-2 bg-[#0f172a] p-2 rounded-2xl border border-slate-800">
+                    <textarea id="user-input" rows="1" class="w-full bg-transparent text-white text-[15px] p-2.5 max-h-32 focus:outline-none resize-none placeholder-slate-500" placeholder="描述你的需求..."></textarea>
+                    
+                    <button id="send-btn" class="w-10 h-10 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl flex items-center justify-center text-white disabled:opacity-50 transition shadow-lg shrink-0 mb-[2px] btn-active">
+                        <span class="icon-send text-sm"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 设置面板 -->
+    <div id="settings-modal" class="fixed inset-0 z-50 flex items-center justify-center invisible">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="modal-backdrop"></div>
+        <div id="modal-content" class="relative z-10 w-[90%] md:w-[400px] bg-[#1e293b] border border-slate-700 rounded-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto scrollbar-hide">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-white font-bold text-lg"><span class="icon-settings mr-2"></span>模型配置</h3>
+                <button id="close-modal-btn" class="w-8 h-8 rounded-full bg-slate-800 text-gray-400 flex items-center justify-center hover:text-white transition btn-active">
+                    <span class="icon-close"></span>
+                </button>
+            </div>
+            
+            <div class="space-y-5">
+                <!-- 服务商切换 -->
+                <div class="space-y-2">
+                    <label class="text-xs text-indigo-400 font-bold uppercase tracking-wider flex justify-between">
+                        选择服务商
+                        <span id="current-provider-label" class="text-gray-500 font-normal">DeepSeek</span>
+                    </label>
+                    <div class="grid grid-cols-3 gap-2 bg-[#0f172a] p-1 rounded-xl border border-slate-700">
+                        <button id="btn-provider-deepseek" class="provider-btn active py-2 rounded-lg text-xs font-bold transition text-white bg-slate-700 shadow-sm" onclick="switchProvider('deepseek')">DeepSeek</button>
+                        <button id="btn-provider-glm" class="provider-btn py-2 rounded-lg text-xs font-bold transition text-gray-400 hover:bg-slate-700" onclick="switchProvider('glm')">GLM-4</button>
+                        <button id="btn-provider-openai" class="provider-btn py-2 rounded-lg text-xs font-bold transition text-gray-400 hover:bg-slate-700" onclick="switchProvider('openai')">OpenAI</button>
+                    </div>
+                </div>
+
+                <!-- API Key -->
+                <div class="space-y-2">
+                    <label class="text-xs text-indigo-400 font-bold uppercase tracking-wider">API Key</label>
+                    <input id="api-key-input" type="password" placeholder="输入你的 API Key" class="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+                </div>
+
+                <!-- API URL (仅OpenAI) -->
+                <div id="api-url-container" class="space-y-2 hidden">
+                    <label class="text-xs text-indigo-400 font-bold uppercase tracking-wider">API URL (可选)</label>
+                    <input id="api-url-input" type="text" placeholder="https://api.openai.com/v1/chat/completions" class="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+                    <p class="text-xs text-gray-500">留空使用官方地址</p>
+                </div>
+
+                <!-- 模型选择 -->
+                <div class="space-y-2">
+                    <label class="text-xs text-indigo-400 font-bold uppercase tracking-wider">选择模型</label>
+                    <select id="model-select" class="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 transition">
+                        <option value="deepseek-chat">DeepSeek Chat</option>
+                    </select>
+                </div>
+
+                <!-- 保存按钮 -->
+                <button id="save-config-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-3 rounded-lg transition shadow-lg flex items-center justify-center gap-2 btn-active">
+                    <span class="icon-save"></span>
+                    保存配置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+// ============= 全局状态管理 =============
+const appState = {
+    provider: 'deepseek',
+    deepseekKey: '',
+    glmKey: '',
+    openaiKey: '',
+    openaiUrl: '',
+    model: 'deepseek-chat',
+    mode: 'normal', // normal, frontend, professional
+    conversationHistory: []
+};
+
+// ============= 本地存储管理 =============
+function loadConfig() {
+    const saved = localStorage.getItem('promptRefinerConfig');
+    if (saved) {
+        const config = JSON.parse(saved);
+        appState.provider = config.provider || 'deepseek';
+        appState.deepseekKey = config.deepseekKey || '';
+        appState.glmKey = config.glmKey || '';
+        appState.openaiKey = config.openaiKey || '';
+        appState.openaiUrl = config.openaiUrl || '';
+        appState.model = config.model || 'deepseek-chat';
+        appState.mode = config.mode || 'normal';
+    }
+    setMode(appState.mode); // 恢复模式状态
+}
+
+function saveConfig() {
+    // 根据当前选择的服务商保存对应的key
+    const currentKey = document.getElementById('api-key-input').value.trim();
+    if (appState.provider === 'deepseek') {
+        appState.deepseekKey = currentKey;
+    } else if (appState.provider === 'glm') {
+        appState.glmKey = currentKey;
+    } else if (appState.provider === 'openai') {
+        appState.openaiKey = currentKey;
+        appState.openaiUrl = document.getElementById('api-url-input').value.trim();
+    }
+    
+    appState.model = document.getElementById('model-select').value;
+    
+    const config = {
+        provider: appState.provider,
+        deepseekKey: appState.deepseekKey,
+        glmKey: appState.glmKey,
+        openaiKey: appState.openaiKey,
+        openaiUrl: appState.openaiUrl,
+        model: appState.model,
+        mode: appState.mode
+    };
+    localStorage.setItem('promptRefinerConfig', JSON.stringify(config));
+    showToast('配置已保存', 'success');
+    toggleSettings();
+}
+
+// ============= 模式切换 =============
+function setMode(mode) {
+    appState.mode = mode;
+    
+    // 更新按钮状态
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const btn = document.getElementById(`mode-${mode}`);
+    if (btn) {
+        btn.classList.add('active');
+    }
+    
+    // 更新UI主题
+    const logo = document.getElementById('app-logo');
+    const subtitle = document.getElementById('app-subtitle');
+    const glow = document.getElementById('input-glow');
+    
+    if (mode === 'frontend') {
+        logo.className = 'w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg transition-all duration-300';
+        subtitle.textContent = 'FRONTEND EDITION';
+        subtitle.style.color = '#ec4899';
+        glow.className = 'absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-rose-600 rounded-2xl opacity-20 group-focus-within:opacity-60 transition duration-500 blur-sm';
+    } else if (mode === 'professional') {
+        logo.className = 'w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg transition-all duration-300';
+        subtitle.textContent = 'PROFESSIONAL EDITION';
+        subtitle.style.color = '#10b981';
+        glow.className = 'absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-2xl opacity-20 group-focus-within:opacity-60 transition duration-500 blur-sm';
+    } else {
+        logo.className = 'w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg transition-all duration-300';
+        subtitle.textContent = 'ULTIMATE PRO';
+        subtitle.style.color = '#94a3b8';
+        glow.className = 'absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl opacity-20 group-focus-within:opacity-60 transition duration-500 blur-sm';
+    }
+    
+    // 保存模式到本地
+    const config = JSON.parse(localStorage.getItem('promptRefinerConfig') || '{}');
+    config.mode = mode;
+    localStorage.setItem('promptRefinerConfig', JSON.stringify(config));
+}
+
+// ============= 服务商切换 =============
+function switchProvider(provider) {
+    appState.provider = provider;
+    document.querySelectorAll('.provider-btn').forEach(b => {
+        b.classList.remove('active', 'bg-slate-700', 'shadow-sm', 'text-white');
+        b.classList.add('text-gray-400', 'hover:bg-slate-700');
+    });
+    const btn = document.getElementById(`btn-provider-${provider}`);
+    btn.classList.add('active', 'bg-slate-700', 'shadow-sm', 'text-white');
+    btn.classList.remove('text-gray-400');
+
+    const providerNames = {
+        'deepseek': 'DeepSeek',
+        'openai': 'OpenAI',
+        'glm': 'GLM-4'
+    };
+    document.getElementById('current-provider-label').textContent = providerNames[provider];
+
+    const modelSelect = document.getElementById('model-select');
+    const urlContainer = document.getElementById('api-url-container');
+    const apiKeyInput = document.getElementById('api-key-input');
+
+    if (provider === 'deepseek') {
+        modelSelect.innerHTML = '<option value="deepseek-chat">DeepSeek Chat</option>';
+        appState.model = 'deepseek-chat';
+        urlContainer.classList.add('hidden');
+        apiKeyInput.value = appState.deepseekKey;
+    } else if (provider === 'glm') {
+        modelSelect.innerHTML = `
+            <option value="glm-4-flash">GLM-4-Flash</option>
+            <option value="glm-4">GLM-4</option>
+            <option value="glm-4-plus">GLM-4 Plus</option>
+        `;
+        appState.model = 'glm-4-flash';
+        urlContainer.classList.add('hidden');
+        apiKeyInput.value = appState.glmKey;
+    } else {
+        modelSelect.innerHTML = `
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+        `;
+        appState.model = 'gpt-4o';
+        urlContainer.classList.remove('hidden');
+        apiKeyInput.value = appState.openaiKey;
+        document.getElementById('api-url-input').value = appState.openaiUrl;
+    }
+    
+    // 同步更新model select的值
+    modelSelect.value = appState.model;
+}
+
+function refreshSettingsUI() {
+    switchProvider(appState.provider);
+    document.getElementById('model-select').value = appState.model;
+}
+
+// ============= 提示词系统 - 核心优化 =============
+const SYSTEM_PROMPTS = {
+    normal: `你是一位资深的 AI Prompt 工程师。你的任务是将用户的粗略想法优化为清晰、具体、高效的 AI 提示词。
+
+**优化原则**：
+1. 明确性：定义清晰的角色、任务目标和输出格式
+2. 结构化：使用步骤分解、示例说明等方式组织内容
+3. 约束性：指定长度、风格、注意事项等限制条件
+4. 可执行：确保AI模型能理解并准确执行
+
+**输出格式**：
+---ANALYSIS_START---
+【原始需求分析】
+- 核心意图：[一句话概括]
+- 缺失要素：[列出不明确的点]
+- 潜在歧义：[可能的理解偏差]
+---ANALYSIS_END---
+
+---OPTIMIZED_START---
+[优化后的完整Prompt，直接可用]
+---OPTIMIZED_END---
+
+**注意**：优化后的Prompt要自然流畅，避免过度技术化。`,
+
+    frontend: `你是一位精通现代前端开发和UI/UX设计的专家。你的任务是将用户的需求转化为专业的前端开发提示词，重点关注视觉效果、用户体验和代码质量。
+
+**前端优化重点**：
+1. **视觉设计**：配色方案、布局美学、动效细节、响应式设计
+2. **技术栈**：明确框架选择（React/Vue/原生）、CSS方案（Tailwind/Styled-components）
+3. **交互体验**：微交互、过渡动画、加载状态、错误处理
+4. **性能优化**：懒加载、代码分割、资源优化
+5. **兼容性**：跨浏览器、移动端适配、无障碍访问
+
+**输出格式**：
+---ANALYSIS_START---
+【需求解析】
+- UI风格定位：[现代/极简/渐变/毛玻璃等]
+- 核心交互：[用户主要操作流程]
+- 技术建议：[推荐技术栈]
+---ANALYSIS_END---
+
+---OPTIMIZED_START---
+[包含完整设计思路、技术选型、实现细节的前端开发Prompt]
+
+**重点要求**：
+- 使用 [技术栈] 实现
+- 采用 [设计风格] 的视觉风格
+- 实现以下交互效果：[具体列举]
+- 确保移动端完美适配
+- 添加流畅的过渡动画（duration: Xms）
+- 支持暗色模式（可选）
+
+**UI参考**：
+[具体的颜色代码、间距规范、字体选择]
+---OPTIMIZED_END---
+
+**特别强调**：前端Prompt需要给出具体的设计参数，而非泛泛而谈。`,
+
+    professional: `你是一位全栈架构师和项目管理专家。你的任务是将用户需求转化为完整的、可直接执行的专业级项目提示词，确保功能完整性和技术严谨性。
+
+**专业模式核心原则**：
+1. **完整性至上**：不遗漏任何功能细节，补充用户未提及但必要的功能
+2. **技术严谨**：明确技术选型、架构设计、安全考量
+3. **可维护性**：代码规范、文档要求、测试策略
+4. **用户体验增强**：在满足需求基础上，主动添加提升体验的功能（需合理且不偏离主题）
+
+**输出格式**：
+---ANALYSIS_START---
+【项目分析】
+- 项目类型：[Web应用/工具/组件库/API服务等]
+- 核心功能：[主要功能模块列表]
+- 技术栈建议：[前端/后端/数据库/部署]
+- 潜在挑战：[可能的技术难点]
+---ANALYSIS_END---
+
+---OPTIMIZED_START---
+# 项目需求文档
+
+## 1. 项目概述
+[项目背景、目标、应用场景]
+
+## 2. 核心功能（必须实现）
+### 2.1 [功能模块1]
+- 功能描述：[详细说明]
+- 技术实现：[具体方案]
+- 验收标准：[如何验证完成]
+
+### 2.2 [功能模块2]
+...
+
+## 3. 增强功能（提升体验）
+### 3.1 [建议增加的功能1]
+- 理由：[为什么添加这个功能]
+- 实现方式：[简要说明]
+
+## 4. 技术规范
+### 4.1 代码规范
+- 命名规范：[变量、函数、类命名规则]
+- 注释要求：[关键逻辑必须注释]
+- 文件结构：[项目目录组织]
+
+### 4.2 兼容性要求
+- 浏览器支持：[Chrome 90+, Safari 14+等]
+- 移动端适配：[响应式/PWA]
+- 本地/服务器双环境支持：[特别强调]
+
+### 4.3 性能要求
+- 首屏加载：[< 2s]
+- 交互响应：[< 100ms]
+- 包大小限制：[具体数值]
+
+## 5. 关键实现细节
+### 5.1 复制功能（必须健全）
+\`\`\`javascript
+// 双重保险：优先Clipboard API，降级execCommand
+// 支持HTTPS、HTTP、file://协议
+// iOS Safari特殊处理
+\`\`\`
+
+### 5.2 下载功能（必须健全）
+\`\`\`javascript
+// 支持Blob URL和Data URL两种方式
+// 文件名自动处理
+// 移动端兼容性测试
+\`\`\`
+
+### 5.3 [其他关键功能的伪代码或技术方案]
+
+## 6. 错误处理
+- 网络请求失败
+- 数据验证失败
+- 兼容性降级方案
+
+## 7. 测试要求
+- 单元测试覆盖率：[具体数值]
+- 手动测试清单：[关键路径]
+
+## 8. 交付标准
+- [ ] 所有核心功能完整实现
+- [ ] 代码符合规范，有必要注释
+- [ ] 移动端和桌面端测试通过
+- [ ] 本地环境和服务器环境均可运行
+- [ ] 错误处理完善
+---OPTIMIZED_END---
+
+**专业模式特别说明**：
+- 不限制UI美化，但功能完整性优先
+- 必须包含完整的技术方案，不能只提需求
+- 主动补充用户未考虑到但项目必需的功能
+- 增强功能要合理，服务于更好的用户体验，不能偏离主题太远`
+};
+
+// ============= 消息发送 =============
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const userText = input.value.trim();
+    if (!userText) return;
+
+    // 根据当前服务商检查对应的key
+    let currentKey = '';
+    if (appState.provider === 'deepseek') {
+        currentKey = appState.deepseekKey;
+    } else if (appState.provider === 'glm') {
+        currentKey = appState.glmKey;
+    } else if (appState.provider === 'openai') {
+        currentKey = appState.openaiKey;
+    }
+
+    if (!currentKey) {
+        showToast('请先在设置中配置 ' + appState.provider.toUpperCase() + ' 的 API Key', 'error');
+        toggleSettings();
+        return;
+    }
+
+    document.getElementById('welcome-screen')?.remove();
+    appendUserMessage(userText);
+    input.value = '';
+    input.style.height = 'auto';
+
+    const aiId = appendAiContainer();
+    await callAIStream(userText, aiId);
+}
+
+// ============= AI 调用 =============
+async function callAIStream(userPrompt, aiId) {
+    const outputEl = document.querySelector(`#${aiId} .markdown-content`);
+    outputEl.classList.add('typing-cursor');
+    document.getElementById('send-btn').disabled = true;
+
+    const systemPrompt = SYSTEM_PROMPTS[appState.mode];
+    const messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+    ];
+
+    let url, headers, bodyData, currentKey;
+    const p = appState.provider;
+
+    if (p === 'deepseek') {
+        currentKey = appState.deepseekKey;
+        url = 'https://api.deepseek.com/chat/completions';
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentKey}`
+        };
+        bodyData = {
+            model: appState.model,
+            messages: messages,
+            stream: true
+        };
+    } else if (p === 'glm') {
+        currentKey = appState.glmKey;
+        url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentKey}`
+        };
+        bodyData = {
+            model: appState.model,
+            messages: messages,
+            stream: true
+        };
+    } else {
+        currentKey = appState.openaiKey;
+        url = appState.openaiUrl || 'https://api.openai.com/v1/chat/completions';
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentKey}`
+        };
+        bodyData = {
+            model: appState.model,
+            messages: messages,
+            stream: true
+        };
+    }
+
+    let fullText = '';
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(bodyData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim().startsWith('data:'));
+
+            for (const line of lines) {
+                if (line.includes('[DONE]')) continue;
+                try {
+                    const data = JSON.parse(line.substring(6));
+                    const content = data.choices[0].delta.content || "";
+                    if (content) {
+                        fullText += content;
+                        outputEl.innerHTML = marked.parse(fullText);
+                        scrollToBottom();
+                    }
+                } catch(e) {}
+            }
+        }
+
+        outputEl.classList.remove('typing-cursor');
+        finalizeAiMessage(aiId, fullText);
+
+    } catch (err) {
+        outputEl.innerHTML = `<span class="text-red-400">请求失败: ${err.message}</span><br><span class="text-xs text-gray-500">检查 Key 或 URL (${p})</span>`;
+    } finally {
+        document.getElementById('send-btn').disabled = false;
+    }
+}
+
+// ============= 消息渲染 =============
+function appendUserMessage(text) {
+    const div = document.createElement('div');
+    div.className = "flex justify-end mb-6";
+    div.innerHTML = `<div class="bg-[#2d3748] text-gray-200 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] border border-slate-600 text-sm leading-relaxed shadow-sm">${escapeHtml(text)}</div>`;
+    document.getElementById('chat-container').appendChild(div);
+    scrollToBottom();
+}
+
+function appendAiContainer() {
+    const id = 'ai-' + Date.now();
+    const div = document.createElement('div');
+    div.className = "flex justify-start mb-8 w-full";
+    div.id = id;
+    
+    const mode = appState.mode;
+    let modeClass = '';
+    let labelContent = '<span class="icon-magic mr-1"></span> Prompt';
+    
+    if (mode === 'frontend') {
+        modeClass = 'frontend-mode';
+        labelContent = '<span class="icon-palette mr-1"></span> UI Design';
+    } else if (mode === 'professional') {
+        modeClass = 'pro-mode';
+        labelContent = '<span class="icon-code mr-1"></span> Professional';
+    }
+    
+    div.innerHTML = `
+        <div class="w-full max-w-full md:max-w-[95%] ${modeClass}">
+            <div class="ai-message-box rounded-2xl rounded-tl-sm p-5 pt-7 relative shadow-xl">
+                <div class="ai-label">${labelContent}</div>
+                <div class="markdown-content prose prose-invert max-w-none text-sm typing-cursor"></div>
+                <div class="action-buttons hidden justify-end mt-4 pt-4 border-t border-slate-700/50 gap-2 flex-wrap"></div>
+            </div>
+        </div>`;
+    document.getElementById('chat-container').appendChild(div);
+    return id;
+}
+
+function finalizeAiMessage(aiId, fullText) {
+    const container = document.getElementById(aiId);
+    const contentEl = container.querySelector('.markdown-content');
+    const actionsEl = container.querySelector('.action-buttons');
+    
+    let html = fullText;
+    const optMatch = fullText.match(/---OPTIMIZED_START---([\s\S]*?)---OPTIMIZED_END---/);
+    const optText = optMatch ? optMatch[1].trim() : fullText;
+
+    html = html
+        .replace(/---ANALYSIS_START---/g, '<div class="analysis-section bg-slate-800/50 rounded-lg p-3 mb-4 border border-slate-700/50 text-xs">')
+        .replace(/---ANALYSIS_END---/g, '</div>')
+        .replace(/---OPTIMIZED_START---/g, '<div class="optimized-section bg-indigo-900/10 rounded-lg p-3 border border-indigo-500/20">')
+        .replace(/---OPTIMIZED_END---/g, '</div>');
+
+    contentEl.innerHTML = marked.parse(html);
+    
+    // 创建操作按钮
+    const mode = appState.mode;
+    const accentColor = mode === 'frontend' ? 'pink' : mode === 'professional' ? 'emerald' : 'indigo';
+    
+    // 复制按钮
+    const copyBtn = document.createElement('button');
+    copyBtn.className = `advanced-btn text-xs text-gray-500 hover:text-${accentColor}-400 flex items-center gap-1 transition py-2 px-3 rounded hover:bg-slate-700/50`;
+    copyBtn.innerHTML = '<span class="icon-copy"></span> 复制Prompt';
+    copyBtn.onclick = () => copyToClipboard(optText, copyBtn);
+    
+    // 下载按钮
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = `advanced-btn text-xs text-gray-500 hover:text-${accentColor}-400 flex items-center gap-1 transition py-2 px-3 rounded hover:bg-slate-700/50`;
+    downloadBtn.innerHTML = '<span class="icon-download"></span> 下载为TXT';
+    downloadBtn.onclick = () => downloadAsFile(optText, `prompt_${Date.now()}.txt`);
+    
+    // 下载Markdown按钮
+    const downloadMdBtn = document.createElement('button');
+    downloadMdBtn.className = `advanced-btn text-xs text-gray-500 hover:text-${accentColor}-400 flex items-center gap-1 transition py-2 px-3 rounded hover:bg-slate-700/50`;
+    downloadMdBtn.innerHTML = '<span class="icon-save"></span> 下载为MD';
+    downloadMdBtn.onclick = () => downloadAsFile(optText, `prompt_${Date.now()}.md`);
+    
+    actionsEl.innerHTML = '';
+    actionsEl.appendChild(copyBtn);
+    actionsEl.appendChild(downloadBtn);
+    actionsEl.appendChild(downloadMdBtn);
+    actionsEl.classList.remove('hidden');
+    actionsEl.classList.add('flex');
+}
+
+// ============= 增强的复制功能（支持本地和服务器） =============
+async function copyToClipboard(text, btn) {
+    let success = false;
+
+    // 方法1: 现代Clipboard API (需要HTTPS或localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            success = true;
+        } catch (err) {
+            console.warn('Clipboard API失败，尝试降级方案...', err);
+        }
+    }
+
+    // 方法2: execCommand降级方案（兼容http和file://）
+    if (!success) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        
+        // 确保元素不可见但可操作
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        textArea.setAttribute('readonly', ''); // 防止移动端弹键盘
+        
+        document.body.appendChild(textArea);
+        
+        // iOS特殊处理
+        if (navigator.userAgent.match(/ipad|iphone/i)) {
+            const range = document.createRange();
+            range.selectNodeContents(textArea);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            textArea.setSelectionRange(0, 999999);
+        } else {
+            textArea.select();
+        }
+
+        try {
+            success = document.execCommand('copy');
+        } catch (err) {
+            console.error('execCommand复制失败', err);
+        }
+        
+        document.body.removeChild(textArea);
+    }
+
+    // 方法3: 最终降级 - 使用contenteditable
+    if (!success) {
+        const div = document.createElement('div');
+        div.contentEditable = true;
+        div.textContent = text;
+        div.style.position = 'fixed';
+        div.style.left = '-9999px';
+        
+        document.body.appendChild(div);
+        
+        const range = document.createRange();
+        range.selectNodeContents(div);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        try {
+            success = document.execCommand('copy');
+        } catch (err) {
+            console.error('contenteditable复制失败', err);
+        }
+        
+        document.body.removeChild(div);
+    }
+
+    // UI反馈
+    if (success) {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="icon-check"></span> 已复制';
+        btn.classList.add('text-green-500');
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('text-green-500');
+        }, 2000);
+        showToast('✓ 复制成功', 'success');
+    } else {
+        showToast('⚠ 复制失败，请手动选择', 'error');
+    }
+}
+
+// ============= 增强的下载功能（支持本地和服务器） =============
+function downloadAsFile(content, filename) {
+    try {
+        // 方法1: Blob + URL.createObjectURL (现代浏览器)
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // 清理
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+        
+        showToast('✓ 下载成功', 'success');
+        
+    } catch (err) {
+        console.error('Blob下载失败，尝试Data URL方案', err);
+        
+        // 方法2: Data URL降级方案
+        try {
+            const dataStr = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = filename;
+            a.style.display = 'none';
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            showToast('✓ 下载成功', 'success');
+            
+        } catch (err2) {
+            console.error('Data URL下载也失败', err2);
+            showToast('⚠ 下载失败，请尝试复制后手动保存', 'error');
+        }
+    }
+}
+
+// ============= 工具函数 =============
+function autoResize(el) { 
+    el.style.height = 'auto'; 
+    el.style.height = el.scrollHeight + 'px'; 
+}
+
+function scrollToBottom() { 
+    const c = document.getElementById('chat-container'); 
+    c.scrollTop = c.scrollHeight; 
+}
+
+function toggleSettings() { 
+    const m = document.getElementById('settings-modal'); 
+    if (m.classList.contains('invisible')) { 
+        refreshSettingsUI(); 
+        m.classList.remove('invisible'); 
+        m.classList.add('visible'); 
+    } else { 
+        m.classList.remove('visible'); 
+        m.classList.add('invisible'); 
+    }
+}
+
+function showToast(msg, type = 'info') {
+    const c = document.getElementById('toast-container');
+    const d = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-500' : 'bg-indigo-600';
+    d.className = `${bgColor} text-white text-xs px-4 py-2 rounded-full shadow-lg transition-all duration-300 transform translate-y-4 opacity-0`;
+    d.innerHTML = msg;
+    c.appendChild(d);
+    requestAnimationFrame(() => { 
+        d.classList.remove('translate-y-4', 'opacity-0'); 
+    });
+    setTimeout(() => { 
+        d.classList.add('opacity-0'); 
+        setTimeout(() => d.remove(), 300); 
+    }, 2500);
+}
+
+function escapeHtml(text) { 
+    return text.replace(/[&<>"']/g, m => ({ 
+        '&': '&amp;', 
+        '<': '&lt;', 
+        '>': '&gt;', 
+        '"': '&quot;', 
+        "'": '&#039;' 
+    }[m])); 
+}
+
+// ============= 事件监听 =============
+document.addEventListener('DOMContentLoaded', () => {
+    loadConfig();
+    
+    const input = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    
+    input.addEventListener('input', (e) => autoResize(e.target));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    sendBtn.addEventListener('click', sendMessage);
+    
+    document.getElementById('settings-btn').addEventListener('click', toggleSettings);
+    document.getElementById('close-modal-btn').addEventListener('click', toggleSettings);
+    document.getElementById('modal-backdrop').addEventListener('click', toggleSettings);
+    
+    document.getElementById('save-config-btn').addEventListener('click', () => {
+        // 不在这里直接赋值，让saveConfig函数处理
+        saveConfig();
+    });
+});
+    </script>
+</body>
+</html>
