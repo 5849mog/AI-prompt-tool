@@ -1,6 +1,6 @@
 Prompt Refiner Ultimate Pro
 
-https://via.placeholder.com/800x450/0b1120/6366f1?text=Prompt+Refiner+Ultimate+Pro
+
 
 一个现代化的 AI 提示词优化工具，支持多种 AI 服务商和专业模式，可将粗略想法转化为专家级 Prompt。
 
